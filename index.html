@@ -454,10 +454,10 @@
         <h2 class="card-title">Apple Health</h2>
         <p class="card-meta">On iPhone: open <em>Health</em> → tap your profile → <em>Export All Health Data</em>. Drop the resulting <code>export.zip</code> here. Everything stays on this device.</p>
         <div class="row-actions">
-          <label class="btn" id="btnHealthImport">
+          <button type="button" class="btn" id="btnHealthImport">
             <span id="healthBtnLabel">Import export.zip</span>
-            <input type="file" accept=".zip,application/zip" id="healthInput" hidden />
-          </label>
+          </button>
+          <input type="file" accept=".zip,application/zip" id="healthInput" hidden />
           <button class="btn ghost-btn" id="btnHealthClear" hidden>Clear health data</button>
         </div>
         <div class="health-progress" id="healthProgress" hidden>

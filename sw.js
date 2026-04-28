@@ -1,5 +1,5 @@
 /* Ritual service worker — cache-first for shell, network-first for the rest */
-const CACHE = 'ritual-v3';
+const CACHE = 'ritual-v4';
 const SHELL = [
   './',
   './index.html',

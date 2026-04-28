@@ -1040,9 +1040,14 @@ function renderHealthStatus() {
 
 function bindHealthImport() {
   const input = $('#healthInput');
+  const triggerBtn = $('#btnHealthImport');
   const progress = $('#healthProgress');
   const progressBar = $('#healthProgressBar');
   const progressText = $('#healthProgressText');
+
+  if (triggerBtn) {
+    triggerBtn.addEventListener('click', () => input.click());
+  }
 
   input.addEventListener('change', async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
