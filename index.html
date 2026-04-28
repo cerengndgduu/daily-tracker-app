@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#1a1614" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Ritual" />
+<title>Ritual — Habit Tracker</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/svg+xml" href="icon.svg" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="style.css" />
+<link rel="preconnect" href="https://api.fontshare.com" />
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&f[]=fraunces@400,500,600&display=swap" rel="stylesheet" />
+</head>
+<body>
+<div class="app" data-view="today">
+
+  <!-- HEADER -->
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" aria-label="Ritual logo">
+        <circle cx="16" cy="16" r="11" />
+        <path d="M16 5 V16 L23 20" stroke-linecap="round" />
+        <circle cx="16" cy="16" r="2.2" fill="currentColor" stroke="none" />
+      </svg>
+      <span class="brand-name">Ritual</span>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn" data-theme-toggle aria-label="Toggle theme">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- DATE STRIP -->
+  <div class="datebar" id="datebar"></div>
+
+  <!-- MAIN VIEWS -->
+  <main class="main">
+
+    <!-- ============ TODAY VIEW ============ -->
+    <section class="view view-today" data-view-content="today">
+
+      <!-- Hero / summary -->
+      <div class="hero">
+        <p class="hero-eyebrow" id="todayEyebrow">Today</p>
+        <h1 class="hero-title" id="todayTitle">Good morning.</h1>
+        <p class="hero-sub" id="todaySummary">Let's see how the day shapes up.</p>
+        <div class="ring-row">
+          <div class="ring" id="dailyRing">
+            <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" class="ring-bg"/><circle cx="40" cy="40" r="34" class="ring-fg" id="ringRoutines"/></svg>
+            <div class="ring-label"><span id="ringRoutinesText">0%</span><small>routines</small></div>
+          </div>
+          <div class="ring">
+            <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" class="ring-bg"/><circle cx="40" cy="40" r="34" class="ring-fg ring-water" id="ringWater"/></svg>
+            <div class="ring-label"><span id="ringWaterText">0%</span><small>water</small></div>
+          </div>
+          <div class="ring">
+            <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" class="ring-bg"/><circle cx="40" cy="40" r="34" class="ring-fg ring-caffeine" id="ringCaffeine"/></svg>
+            <div class="ring-label"><span id="ringCaffeineText">0%</span><small>caffeine</small></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick loggers -->
+      <div class="cards-row">
+        <!-- Water -->
+        <article class="card logger logger-water">
+          <header class="logger-head">
+            <div>
+              <h2 class="card-title">Water</h2>
+              <p class="card-meta"><span id="waterAmount">0</span> / <span id="waterGoal">2500</span> ml</p>
+            </div>
+            <span class="badge" id="waterBadge">—</span>
+          </header>
+          <div class="bar"><div class="bar-fg" id="waterBar"></div></div>
+          <div class="quick-add">
+            <button class="chip" data-water="250">+250</button>
+            <button class="chip" data-water="500">+500</button>
+            <button class="chip" data-water="750">+750</button>
+            <button class="chip ghost" data-water-undo aria-label="Undo last water">↺</button>
+          </div>
+        </article>
+
+        <!-- Caffeine -->
+        <article class="card logger logger-caffeine">
+          <header class="logger-head">
+            <div>
+              <h2 class="card-title">Caffeine</h2>
+              <p class="card-meta"><span id="caffeineAmount">0</span> / <span id="caffeineGoal">400</span> mg</p>
+            </div>
+            <span class="badge" id="caffeineBadge">—</span>
+          </header>
+          <div class="bar"><div class="bar-fg" id="caffeineBar"></div></div>
+          <div class="quick-add">
+            <button class="chip" data-caffeine="80" data-label="Espresso">Espresso 80</button>
+            <button class="chip" data-caffeine="95" data-label="Coffee">Coffee 95</button>
+            <button class="chip" data-caffeine="50" data-label="Tea">Tea 50</button>
+            <button class="chip" data-caffeine="160" data-label="Energy">Energy 160</button>
+            <button class="chip ghost" data-caffeine-undo aria-label="Undo last caffeine">↺</button>
+          </div>
+        </article>
+      </div>
+
+      <!-- Daily routines -->
+      <div class="cards-row">
+        <article class="card routine" data-routine="morning">
+          <header class="routine-head">
+            <h2 class="card-title">Morning</h2>
+            <span class="streak" id="streakMorning">🔥 0</span>
+          </header>
+          <ul class="checklist" id="checklistMorning"></ul>
+        </article>
+
+        <article class="card routine" data-routine="evening">
+          <header class="routine-head">
+            <h2 class="card-title">Evening</h2>
+            <span class="streak" id="streakEvening">🌙 0</span>
+          </header>
+          <ul class="checklist" id="checklistEvening"></ul>
+        </article>
+      </div>
+
+      <!-- Workout / Body / Photo -->
+      <div class="cards-row triple">
+        <article class="card mini">
+          <h3 class="card-title sm">Workout</h3>
+          <div class="seg" role="group" aria-label="Workout state">
+            <button class="seg-btn" data-workout="trained">Trained</button>
+            <button class="seg-btn" data-workout="rest">Rest</button>
+            <button class="seg-btn" data-workout="">Clear</button>
+          </div>
+          <input class="note-input" id="workoutNote" placeholder="Quick note (optional)" />
+        </article>
+
+        <article class="card mini">
+          <h3 class="card-title sm">Body metrics</h3>
+          <div class="grid-2">
+            <label class="field"><span>Sleep (h)</span><input type="number" step="0.1" id="metricSleep" placeholder="7.5" /></label>
+            <label class="field"><span>RHR (bpm)</span><input type="number" id="metricRhr" placeholder="62" /></label>
+            <label class="field"><span>HRV (ms)</span><input type="number" id="metricHrv" placeholder="45" /></label>
+            <label class="field"><span>Stress</span>
+              <select id="metricStress">
+                <option value="">—</option><option>Low</option><option>Medium</option><option>High</option>
+              </select>
+            </label>
+          </div>
+        </article>
+
+        <article class="card mini">
+          <h3 class="card-title sm">Daily photo</h3>
+          <div class="photo-slot" id="photoSlot">
+            <input type="file" accept="image/*" capture="user" id="photoInput" hidden />
+            <button class="photo-btn" id="photoBtn">Add photo</button>
+          </div>
+        </article>
+      </div>
+
+      <!-- Cadence (weekly + monthly) -->
+      <div class="cards-row">
+        <article class="card cadence">
+          <header class="routine-head">
+            <h2 class="card-title">This week</h2>
+            <span class="meta-tag" id="weekTag"></span>
+          </header>
+          <ul class="checklist" id="checklistWeekly"></ul>
+        </article>
+
+        <article class="card cadence">
+          <header class="routine-head">
+            <h2 class="card-title">This month</h2>
+            <span class="meta-tag" id="monthTag"></span>
+          </header>
+          <ul class="checklist" id="checklistMonthly"></ul>
+        </article>
+      </div>
+
+    </section>
+
+    <!-- ============ INSIGHTS VIEW ============ -->
+    <section class="view view-insights" data-view-content="insights" hidden>
+      <div class="hero compact">
+        <p class="hero-eyebrow">Insights</p>
+        <h1 class="hero-title">Patterns over time.</h1>
+      </div>
+
+      <div class="insights-grid">
+        <article class="card chart-card">
+          <header class="routine-head">
+            <h2 class="card-title">14-day adherence</h2>
+            <span class="meta-tag" id="adherenceAvg">—</span>
+          </header>
+          <canvas id="chartAdherence" height="180"></canvas>
+          <p class="legend"><span class="dot dot-primary"></span>Routines completed (%)</p>
+        </article>
+
+        <article class="card chart-card">
+          <header class="routine-head">
+            <h2 class="card-title">Hydration & caffeine</h2>
+            <span class="meta-tag">last 14d</span>
+          </header>
+          <canvas id="chartLiquids" height="180"></canvas>
+          <p class="legend"><span class="dot dot-water"></span>Water (ml) <span class="dot dot-caffeine"></span>Caffeine (mg)</p>
+        </article>
+
+        <article class="card chart-card">
+          <header class="routine-head">
+            <h2 class="card-title">Sleep vs caffeine</h2>
+            <span class="meta-tag" id="corrTag">—</span>
+          </header>
+          <canvas id="chartCorr" height="180"></canvas>
+          <p class="legend tiny">Each dot is a day. Y = sleep (h), X = caffeine (mg).</p>
+        </article>
+
+        <article class="card chart-card">
+          <header class="routine-head">
+            <h2 class="card-title">Workout & rest</h2>
+            <span class="meta-tag" id="workoutTag">—</span>
+          </header>
+          <canvas id="chartWorkout" height="120"></canvas>
+          <p class="legend tiny">Last 28 days · trained vs rest</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SETTINGS VIEW ============ -->
+    <section class="view view-settings" data-view-content="settings" hidden>
+      <div class="hero compact">
+        <p class="hero-eyebrow">Settings</p>
+        <h1 class="hero-title">Tune your ritual.</h1>
+      </div>
+
+      <article class="card">
+        <h2 class="card-title">Daily targets</h2>
+        <div class="grid-2 settings-grid">
+          <label class="field"><span>Water goal (ml)</span><input type="number" id="setWaterGoal" /></label>
+          <label class="field"><span>Caffeine cap (mg)</span><input type="number" id="setCaffeineGoal" /></label>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2 class="card-title">Morning routine</h2>
+        <ul class="edit-list" id="editMorning"></ul>
+        <div class="add-row"><input id="addMorning" placeholder="Add a morning step…" /><button class="btn" data-add="morning">Add</button></div>
+      </article>
+
+      <article class="card">
+        <h2 class="card-title">Evening routine</h2>
+        <ul class="edit-list" id="editEvening"></ul>
+        <div class="add-row"><input id="addEvening" placeholder="Add an evening step…" /><button class="btn" data-add="evening">Add</button></div>
+      </article>
+
+      <article class="card">
+        <h2 class="card-title">Weekly habits</h2>
+        <p class="card-meta">Set the per-week target count for each.</p>
+        <ul class="edit-list with-target" id="editWeekly"></ul>
+        <div class="add-row">
+          <input id="addWeekly" placeholder="Add a weekly habit…" />
+          <input id="addWeeklyTarget" type="number" min="1" max="14" value="1" style="width:5rem" />
+          <button class="btn" data-add="weekly">Add</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2 class="card-title">Monthly habits</h2>
+        <ul class="edit-list" id="editMonthly"></ul>
+        <div class="add-row"><input id="addMonthly" placeholder="Add a monthly habit…" /><button class="btn" data-add="monthly">Add</button></div>
+      </article>
+
+      <article class="card">
+        <h2 class="card-title">Data</h2>
+        <p class="card-meta">Your data lives only on this device. Export a backup, or import on another device.</p>
+        <div class="row-actions">
+          <button class="btn" id="btnExport">Export JSON</button>
+          <label class="btn ghost-btn">
+            Import JSON
+            <input type="file" accept="application/json" id="importInput" hidden />
+          </label>
+          <button class="btn danger" id="btnReset">Reset all</button>
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <!-- BOTTOM NAV -->
+  <nav class="tabbar" role="tablist" aria-label="Primary">
+    <button class="tab" data-tab="today" aria-current="page">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span>Today</span>
+    </button>
+    <button class="tab" data-tab="insights">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-7"/></svg>
+      <span>Patterns</span>
+    </button>
+    <button class="tab" data-tab="settings">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      <span>Settings</span>
+    </button>
+  </nav>
+
+  <div class="toast" id="toast" hidden></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  }
+</script>
+</body>
+</html>
