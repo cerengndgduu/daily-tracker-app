@@ -515,33 +515,11 @@
 <script src="health.js"></script>
 <script src="app.js"></script>
 <script>
-  // Service worker registration with auto-reload when a new version takes control.
-  // This ensures stale PWAs (especially installed home-screen apps) pick up deploys
-  // on the next launch instead of being stuck on an old shell.
+  // Simple service worker registration. The SW serves the app shell network-first,
+  // so deploys land on the next regular page load — no auto-reload needed.
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', async () => {
-      try {
-        const reg = await navigator.serviceWorker.register('sw.js');
-        // If a new SW is found, ask it to activate immediately.
-        reg.addEventListener('updatefound', () => {
-          const sw = reg.installing;
-          if (!sw) return;
-          sw.addEventListener('statechange', () => {
-            if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-              sw.postMessage('SKIP_WAITING');
-            }
-          });
-        });
-        // Reload once when the controller swaps so the user sees the new shell.
-        let didReload = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (didReload) return;
-          didReload = true;
-          window.location.reload();
-        });
-        // Trigger an update check on every load.
-        reg.update().catch(()=>{});
-      } catch (e) { /* ignore */ }
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
     });
   }
 </script>

@@ -1,6 +1,6 @@
 /* Ritual service worker — network-first for app shell so updates land instantly,
    cache-first for static deps. Offline still works via cached fallback. */
-const CACHE = 'ritual-v5';
+const CACHE = 'ritual-v6';
 const SHELL = [
   './',
   './index.html',
@@ -31,11 +31,9 @@ self.addEventListener('install', (e) => {
   self.skipWaiting();
 });
 self.addEventListener('activate', (e) => {
+  // Clean up old caches. Do NOT call clients.claim() — letting the old SW finish the
+  // current session prevents mid-page reloads / glitches when the user is interacting.
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
-  self.clients.claim();
-});
-self.addEventListener('message', (e) => {
-  if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
 self.addEventListener('fetch', (e) => {
   const req = e.request;
