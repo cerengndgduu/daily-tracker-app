@@ -181,13 +181,123 @@
 
     </section>
 
-    <!-- ============ INSIGHTS VIEW ============ -->
-    <section class="view view-insights" data-view-content="insights" hidden>
+    <!-- ============ SLEEP VIEW ============ -->
+    <section class="view view-sleep" data-view-content="sleep" hidden>
       <div class="hero compact">
-        <p class="hero-eyebrow">Insights</p>
-        <h1 class="hero-title">Patterns over time.</h1>
+        <p class="hero-eyebrow" id="sleepEyebrow">Last night</p>
+        <h1 class="hero-title" id="sleepTitle">Sleep</h1>
+        <p class="hero-sub" id="sleepSub">Import your Apple Health export in Settings to unlock detailed analysis.</p>
       </div>
 
+      <article class="card sleep-summary" id="sleepSummaryCard" hidden>
+        <header class="routine-head">
+          <h2 class="card-title">Last night</h2>
+          <span class="meta-tag" id="sleepDateTag">—</span>
+        </header>
+        <div class="sleep-headline">
+          <div class="sleep-duration">
+            <span class="big-num" id="sleepDur">—</span>
+            <span class="big-num-unit">hours</span>
+          </div>
+          <div class="sleep-windows">
+            <div><small>In bed</small><strong id="sleepBed">—</strong></div>
+            <div><small>Wake</small><strong id="sleepWake">—</strong></div>
+            <div><small>Δ vs 30-day</small><strong id="sleepDelta">—</strong></div>
+          </div>
+        </div>
+        <div class="stage-bar" id="stageBar" aria-label="Sleep stages"></div>
+        <ul class="stage-legend" id="stageLegend"></ul>
+      </article>
+
+      <article class="card chart-card" id="sleepTrendsCard" hidden>
+        <header class="routine-head">
+          <h2 class="card-title">14-day sleep trend</h2>
+          <span class="meta-tag" id="sleepAvgTag">—</span>
+        </header>
+        <canvas id="chartSleep14" height="180"></canvas>
+        <p class="legend"><span class="dot dot-primary"></span>Hours slept · dashed line = baseline</p>
+      </article>
+
+      <article class="card chart-card" id="sleepHrvCard" hidden>
+        <header class="routine-head">
+          <h2 class="card-title">Sleeping HR & HRV</h2>
+          <span class="meta-tag">last 30 days</span>
+        </header>
+        <canvas id="chartSleepHrv" height="180"></canvas>
+        <p class="legend"><span class="dot dot-primary"></span>HRV (ms) <span class="dot dot-water"></span>RHR (bpm)</p>
+      </article>
+
+      <article class="card coaching" id="sleepTipsCard" hidden>
+        <h2 class="card-title">What this means</h2>
+        <ul class="tip-list" id="sleepTips"></ul>
+      </article>
+
+      <article class="card empty-state" id="sleepEmpty">
+        <h2 class="card-title">No sleep data yet</h2>
+        <p class="card-meta">Open the Health app on your iPhone, tap your profile, choose <em>Export All Health Data</em>, then upload the resulting <code>.zip</code> in Settings → Apple Health.</p>
+      </article>
+    </section>
+
+    <!-- ============ RECOVERY VIEW ============ -->
+    <section class="view view-recovery" data-view-content="recovery" hidden>
+      <div class="hero compact">
+        <p class="hero-eyebrow">Today</p>
+        <h1 class="hero-title">Recovery & strain</h1>
+        <p class="hero-sub" id="recoverySub">Readiness from your HRV, RHR, and sleep — measured against your own 30-day baseline.</p>
+      </div>
+
+      <article class="card readiness-card" id="readinessCard" hidden>
+        <header class="routine-head">
+          <h2 class="card-title">Readiness</h2>
+          <span class="meta-tag" id="readinessBand">—</span>
+        </header>
+        <div class="readiness-row">
+          <div class="readiness-dial">
+            <svg viewBox="0 0 120 120" aria-label="Readiness score">
+              <circle cx="60" cy="60" r="50" class="ring-bg" stroke-width="10" fill="none"/>
+              <circle cx="60" cy="60" r="50" id="readinessRing" class="ring-fg" stroke-width="10" fill="none" pathLength="100"/>
+            </svg>
+            <div class="readiness-num"><span id="readinessScore">—</span><small>/100</small></div>
+          </div>
+          <ul class="readiness-parts" id="readinessParts"></ul>
+        </div>
+        <p class="coaching-line" id="readinessAdvice">—</p>
+      </article>
+
+      <article class="card flags-card" id="strainCard" hidden>
+        <h2 class="card-title">Daytime strain</h2>
+        <div id="strainContent" class="flag-content"></div>
+      </article>
+
+      <article class="card flags-card" id="illnessCard" hidden>
+        <h2 class="card-title">Illness early-warning</h2>
+        <div id="illnessContent" class="flag-content"></div>
+      </article>
+
+      <article class="card chart-card" id="readinessTrendCard" hidden>
+        <header class="routine-head">
+          <h2 class="card-title">30-day readiness trend</h2>
+          <span class="meta-tag" id="readinessAvg">—</span>
+        </header>
+        <canvas id="chartReadiness" height="180"></canvas>
+        <p class="legend"><span class="dot dot-primary"></span>Daily score · color shows band</p>
+      </article>
+
+      <article class="card empty-state" id="recoveryEmpty">
+        <h2 class="card-title">Need more data</h2>
+        <p class="card-meta">Recovery scoring needs at least 3 days of HRV or RHR history. Import your Apple Health export from Settings to seed your baselines.</p>
+      </article>
+    </section>
+
+    <!-- ============ INSIGHTS / PATTERNS VIEW ============ -->
+    <section class="view view-insights" data-view-content="insights" hidden>
+      <div class="hero compact">
+        <p class="hero-eyebrow">Patterns</p>
+        <h1 class="hero-title">Patterns over time.</h1>
+        <p class="hero-sub">Habits, body, sleep — and the connections between them.</p>
+      </div>
+
+      <div class="section-head"><h2 class="section-title">Habits</h2></div>
       <div class="insights-grid">
         <article class="card chart-card">
           <header class="routine-head">
@@ -209,6 +319,57 @@
 
         <article class="card chart-card">
           <header class="routine-head">
+            <h2 class="card-title">Workout & rest</h2>
+            <span class="meta-tag" id="workoutTag">—</span>
+          </header>
+          <canvas id="chartWorkout" height="120"></canvas>
+          <p class="legend tiny">Last 28 days · trained vs rest</p>
+        </article>
+      </div>
+
+      <div class="section-head"><h2 class="section-title">Body & sleep</h2></div>
+      <div class="insights-grid">
+        <article class="card chart-card">
+          <header class="routine-head">
+            <h2 class="card-title">Sleep duration</h2>
+            <span class="meta-tag" id="sleepHabAvg">—</span>
+          </header>
+          <canvas id="chartSleepHabit" height="180"></canvas>
+          <p class="legend tiny">Last 30 days</p>
+        </article>
+
+        <article class="card chart-card">
+          <header class="routine-head">
+            <h2 class="card-title">HRV & resting HR</h2>
+            <span class="meta-tag">last 30d</span>
+          </header>
+          <canvas id="chartHrvRhr" height="180"></canvas>
+          <p class="legend"><span class="dot dot-primary"></span>HRV (ms) <span class="dot dot-water"></span>RHR (bpm)</p>
+        </article>
+
+        <article class="card chart-card">
+          <header class="routine-head">
+            <h2 class="card-title">Stages mix</h2>
+            <span class="meta-tag">last 14d</span>
+          </header>
+          <canvas id="chartStages" height="180"></canvas>
+          <p class="legend tiny"><span class="dot" style="background:var(--stage-deep)"></span>Deep <span class="dot" style="background:var(--stage-rem)"></span>REM <span class="dot" style="background:var(--stage-core)"></span>Core <span class="dot" style="background:var(--stage-awake)"></span>Awake</p>
+        </article>
+
+        <article class="card chart-card">
+          <header class="routine-head">
+            <h2 class="card-title">Respiratory rate & wrist temp</h2>
+            <span class="meta-tag">last 30d</span>
+          </header>
+          <canvas id="chartRespTemp" height="180"></canvas>
+          <p class="legend tiny">Helps spot illness — both creep up before symptoms.</p>
+        </article>
+      </div>
+
+      <div class="section-head"><h2 class="section-title">Connections</h2></div>
+      <div class="insights-grid">
+        <article class="card chart-card">
+          <header class="routine-head">
             <h2 class="card-title">Sleep vs caffeine</h2>
             <span class="meta-tag" id="corrTag">—</span>
           </header>
@@ -218,11 +379,29 @@
 
         <article class="card chart-card">
           <header class="routine-head">
-            <h2 class="card-title">Workout & rest</h2>
-            <span class="meta-tag" id="workoutTag">—</span>
+            <h2 class="card-title">Sleep vs HRV the next morning</h2>
+            <span class="meta-tag" id="corrSleepHrvTag">—</span>
           </header>
-          <canvas id="chartWorkout" height="120"></canvas>
-          <p class="legend tiny">Last 28 days · trained vs rest</p>
+          <canvas id="chartSleepHrv2" height="180"></canvas>
+          <p class="legend tiny">Y = HRV (ms), X = sleep hours that night.</p>
+        </article>
+
+        <article class="card chart-card">
+          <header class="routine-head">
+            <h2 class="card-title">Routines vs readiness</h2>
+            <span class="meta-tag" id="corrRoutineReadyTag">—</span>
+          </header>
+          <canvas id="chartRoutineReady" height="180"></canvas>
+          <p class="legend tiny">Y = readiness, X = routines completed (%).</p>
+        </article>
+
+        <article class="card chart-card">
+          <header class="routine-head">
+            <h2 class="card-title">Hydration vs HRV</h2>
+            <span class="meta-tag" id="corrWaterHrvTag">—</span>
+          </header>
+          <canvas id="chartWaterHrv" height="180"></canvas>
+          <p class="legend tiny">Y = HRV (ms), X = water (ml).</p>
         </article>
       </div>
     </section>
@@ -272,6 +451,23 @@
       </article>
 
       <article class="card">
+        <h2 class="card-title">Apple Health</h2>
+        <p class="card-meta">On iPhone: open <em>Health</em> → tap your profile → <em>Export All Health Data</em>. Drop the resulting <code>export.zip</code> here. Everything stays on this device.</p>
+        <div class="row-actions">
+          <label class="btn" id="btnHealthImport">
+            <span id="healthBtnLabel">Import export.zip</span>
+            <input type="file" accept=".zip,application/zip" id="healthInput" hidden />
+          </label>
+          <button class="btn ghost-btn" id="btnHealthClear" hidden>Clear health data</button>
+        </div>
+        <div class="health-progress" id="healthProgress" hidden>
+          <div class="bar"><div class="bar-fg" id="healthProgressBar"></div></div>
+          <p class="card-meta" id="healthProgressText">Reading…</p>
+        </div>
+        <p class="card-meta" id="healthStatus">No Apple Health data imported yet.</p>
+      </article>
+
+      <article class="card">
         <h2 class="card-title">Data</h2>
         <p class="card-meta">Your data lives only on this device. Export a backup, or import on another device.</p>
         <div class="row-actions">
@@ -293,12 +489,20 @@
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
       <span>Today</span>
     </button>
+    <button class="tab" data-tab="sleep">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <span>Sleep</span>
+    </button>
+    <button class="tab" data-tab="recovery">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+      <span>Recovery</span>
+    </button>
     <button class="tab" data-tab="insights">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-7"/></svg>
       <span>Patterns</span>
     </button>
     <button class="tab" data-tab="settings">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/></svg>
       <span>Settings</span>
     </button>
   </nav>
@@ -307,6 +511,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+<script src="health.js"></script>
 <script src="app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

@@ -44,7 +44,10 @@ const DEFAULTS = {
   // months: keyed YYYY-MM   -> { habitName: count }
   months: {},
   // photos: keyed YYYY-MM-DD -> dataURL (small)
-  photos: {}
+  photos: {},
+  // health: keyed YYYY-MM-DD -> { sleepH, sleepStages{coreH,deepH,remH,awakeH,inBedH}, bedTime, wakeTime, hrvMs, rhrBpm, walkingHrBpm, respRate, wristTempC, daytimeHrAvg }
+  health: {},
+  healthMeta: { lastImport: null, recordsScanned: 0, dayCount: 0 }
 };
 
 const STORE_KEY = 'ritual.state.v1';
@@ -108,6 +111,8 @@ let currentView = 'today';
     root.setAttribute('data-theme', pref);
     swapIcon(pref);
     if (currentView === 'insights') renderInsights();
+    if (currentView === 'sleep') renderSleep();
+    if (currentView === 'recovery') renderRecovery();
   });
 })();
 
@@ -419,6 +424,8 @@ function bindTabs() {
     t.setAttribute('aria-current', 'page');
     $$('[data-view-content]').forEach(v => v.hidden = v.dataset.viewContent !== currentView);
     if (currentView === 'today') renderToday();
+    if (currentView === 'sleep') renderSleep();
+    if (currentView === 'recovery') renderRecovery();
     if (currentView === 'insights') renderInsights();
     if (currentView === 'settings') renderSettings();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -690,6 +697,574 @@ function toast(msg) {
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
 function escapeAttr(s) { return escapeHtml(s); }
 
+/* ==========================================================
+   HEALTH DATA — merging Apple Health into per-day records
+   ========================================================== */
+
+// Combined health view: prefer imported Apple Health values, fall back to
+// whatever the user typed manually in `state.days[key]`.
+function healthFor(key) {
+  const ah = state.health?.[key] || {};
+  const manual = state.days?.[key] || {};
+  return {
+    sleepH:        ah.sleepH       ?? manual.sleepH       ?? null,
+    sleepStages:   ah.sleepStages  ?? null,
+    bedTime:       ah.bedTime      ?? null,
+    wakeTime:      ah.wakeTime     ?? null,
+    hrvMs:         ah.hrvMs        ?? manual.hrvMs        ?? null,
+    rhrBpm:        ah.rhrBpm       ?? manual.rhrBpm       ?? null,
+    walkingHrBpm:  ah.walkingHrBpm ?? null,
+    respRate:      ah.respRate     ?? null,
+    wristTempC:    ah.wristTempC   ?? null,
+    daytimeHrAvg:  ah.daytimeHrAvg ?? null
+  };
+}
+
+// Build a {key: combined} map for the helper functions in health.js.
+function buildCombinedHealth() {
+  const out = {};
+  const keys = new Set([...Object.keys(state.health || {}), ...Object.keys(state.days || {})]);
+  for (const k of keys) out[k] = healthFor(k);
+  return out;
+}
+
+function hasAnyHealth() {
+  if (!state.health) return false;
+  return Object.keys(state.health).length > 0 ||
+    Object.values(state.days || {}).some(d => d?.sleepH != null || d?.hrvMs != null || d?.rhrBpm != null);
+}
+
+function fmtTime(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); }
+  catch { return '—'; }
+}
+function hM(h) {
+  if (h == null || !isFinite(h)) return '—';
+  const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+  return `${hh}h ${String(mm).padStart(2, '0')}m`;
+}
+function signed(n, decimals = 1) {
+  if (n == null || !isFinite(n)) return '—';
+  const s = n >= 0 ? '+' : '';
+  return s + n.toFixed(decimals);
+}
+
+/* ===== SLEEP VIEW ===== */
+function renderSleep() {
+  const combined = buildCombinedHealth();
+  const RH = window.RitualHealth;
+  const empty = $('#sleepEmpty');
+  const summary = $('#sleepSummaryCard');
+  const trends = $('#sleepTrendsCard');
+  const hrvCard = $('#sleepHrvCard');
+  const tipsCard = $('#sleepTipsCard');
+
+  if (!hasAnyHealth() || !RH) {
+    empty.hidden = false;
+    [summary, trends, hrvCard, tipsCard].forEach(c => c.hidden = true);
+    return;
+  }
+
+  // Pick the most recent day with sleep data.
+  let key = currentDateKey;
+  if (!combined[key]?.sleepH) {
+    const candidates = Object.keys(combined).filter(k => combined[k].sleepH != null).sort();
+    if (candidates.length) key = candidates[candidates.length - 1];
+  }
+  const data = combined[key] || {};
+  if (data.sleepH == null) {
+    empty.hidden = false;
+    [summary, trends, hrvCard, tipsCard].forEach(c => c.hidden = true);
+    return;
+  }
+
+  empty.hidden = true;
+  summary.hidden = false; trends.hidden = false; hrvCard.hidden = false; tipsCard.hidden = false;
+
+  // Headline
+  const dateObj = new Date(key + 'T12:00:00');
+  $('#sleepEyebrow').textContent = key === todayKey() ? 'Last night' : fmtDayLong(dateObj);
+  $('#sleepTitle').textContent = hM(data.sleepH);
+  $('#sleepSub').textContent = `Recorded by Apple Health · attributed to ${dateObj.toLocaleDateString(undefined, { weekday: 'long' })}`;
+  $('#sleepDateTag').textContent = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  $('#sleepDur').textContent = data.sleepH.toFixed(1);
+  $('#sleepBed').textContent = fmtTime(data.bedTime);
+  $('#sleepWake').textContent = fmtTime(data.wakeTime);
+
+  const base = RH.rollingBaseline(combined, key, 30, d => d?.sleepH);
+  const deltaEl = $('#sleepDelta');
+  if (base) {
+    const d = data.sleepH - base.mean;
+    deltaEl.textContent = signed(d, 1) + ' h';
+    deltaEl.style.color = Math.abs(d) > 0.75 ? (d > 0 ? 'var(--success)' : 'var(--danger)') : 'var(--text)';
+  } else {
+    deltaEl.textContent = '—';
+  }
+
+  // Stage bar + legend
+  const bar = $('#stageBar'); bar.innerHTML = '';
+  const legend = $('#stageLegend'); legend.innerHTML = '';
+  if (data.sleepStages) {
+    const s = data.sleepStages;
+    const total = (s.coreH || 0) + (s.deepH || 0) + (s.remH || 0) + (s.awakeH || 0);
+    const stages = [
+      { cls: 'stg-deep',  lbl: 'Deep',  h: s.deepH  || 0 },
+      { cls: 'stg-rem',   lbl: 'REM',   h: s.remH   || 0 },
+      { cls: 'stg-core',  lbl: 'Core',  h: s.coreH  || 0 },
+      { cls: 'stg-awake', lbl: 'Awake', h: s.awakeH || 0 }
+    ];
+    stages.forEach(st => {
+      if (st.h <= 0) return;
+      const seg = document.createElement('span');
+      seg.className = st.cls;
+      seg.style.flex = `${st.h} 1 0`;
+      seg.title = `${st.lbl}: ${hM(st.h)}`;
+      bar.appendChild(seg);
+    });
+    stages.forEach(st => {
+      const li = document.createElement('li');
+      const pct = total > 0 ? (st.h / total) * 100 : 0;
+      li.innerHTML = `<span class="lbl"><span class="swatch" style="background:var(--stage-${st.lbl.toLowerCase()})"></span>${st.lbl}</span><span class="val">${hM(st.h)} <span style="color:var(--text-faint);font-weight:400">· ${pct.toFixed(0)}%</span></span>`;
+      legend.appendChild(li);
+    });
+  } else {
+    bar.innerHTML = '<span style="flex:1;background:var(--surface-3)"></span>';
+    legend.innerHTML = '<li class="card-meta" style="grid-column:1/-1">Stage breakdown not available for this night.</li>';
+  }
+
+  // Coaching tips
+  const summaryRes = RH.sleepSummary(combined, key);
+  const tips = $('#sleepTips'); tips.innerHTML = '';
+  summaryRes.tips.forEach(t => {
+    const li = document.createElement('li');
+    li.className = t.kind || 'info';
+    li.textContent = t.text;
+    tips.appendChild(li);
+  });
+  if (!summaryRes.tips.length) {
+    tips.innerHTML = '<li class="info">No notable patterns yet — keep importing your Health data so the engine can build personalized baselines.</li>';
+  }
+
+  renderSleepCharts(combined, key);
+}
+
+function renderSleepCharts(combined, refKey) {
+  ['sleep14', 'sleepHrv'].forEach(k => charts[k]?.destroy?.());
+
+  const colorPrimary = getCSSVar('--primary');
+  const colorWater = getCSSVar('--water');
+  const colorText = getCSSVar('--text-muted');
+  const colorGrid = getCSSVar('--divider');
+
+  // 14-day sleep duration vs baseline line
+  const days14 = lastNDays(14);
+  const labels14 = days14.map(d => d.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+  const sleepArr = days14.map(d => combined[d.key]?.sleepH ?? null);
+  const RH = window.RitualHealth;
+  const base = RH.rollingBaseline(combined, refKey, 30, d => d?.sleepH);
+  const baseLine = base ? days14.map(() => +base.mean.toFixed(2)) : [];
+  const datasets14 = [
+    { label: 'Sleep (h)', data: sleepArr, borderColor: colorPrimary, backgroundColor: 'transparent', tension: 0.35, pointRadius: 3, pointBackgroundColor: colorPrimary, borderWidth: 2, spanGaps: true }
+  ];
+  if (base) datasets14.push({ label: 'Baseline', data: baseLine, borderColor: colorText, borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, fill: false });
+
+  charts.sleep14 = new Chart($('#chartSleep14'), {
+    type: 'line',
+    data: { labels: labels14, datasets: datasets14 },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: false, suggestedMin: 4, suggestedMax: 10, grid: { color: colorGrid }, title: { display: true, text: 'h', color: colorText } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+  const sleepValid = sleepArr.filter(v => typeof v === 'number');
+  $('#sleepAvgTag').textContent = sleepValid.length
+    ? `${(sleepValid.reduce((a,b)=>a+b,0)/sleepValid.length).toFixed(1)} h avg`
+    : 'no data';
+
+  // 30-day sleeping HR + HRV
+  const days30 = lastNDays(30);
+  const labels30 = days30.map(d => d.date.getDate());
+  const hrv = days30.map(d => combined[d.key]?.hrvMs ?? null);
+  const rhr = days30.map(d => combined[d.key]?.rhrBpm ?? null);
+  charts.sleepHrv = new Chart($('#chartSleepHrv'), {
+    type: 'line',
+    data: {
+      labels: labels30,
+      datasets: [
+        { label: 'HRV (ms)', data: hrv, borderColor: colorPrimary, yAxisID: 'y', tension: 0.35, pointRadius: 2, pointBackgroundColor: colorPrimary, borderWidth: 2, spanGaps: true },
+        { label: 'RHR (bpm)', data: rhr, borderColor: colorWater, yAxisID: 'y1', tension: 0.35, pointRadius: 2, pointBackgroundColor: colorWater, borderWidth: 2, spanGaps: true }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        y:  { position: 'left', grid: { color: colorGrid }, title: { display: true, text: 'ms', color: colorText } },
+        y1: { position: 'right', grid: { display: false }, title: { display: true, text: 'bpm', color: colorText } },
+        x: { grid: { display: false }, ticks: { autoSkip: true, maxTicksLimit: 10 } }
+      }
+    }
+  });
+}
+
+/* ===== RECOVERY VIEW ===== */
+function renderRecovery() {
+  const combined = buildCombinedHealth();
+  const RH = window.RitualHealth;
+  const empty = $('#recoveryEmpty');
+  const card = $('#readinessCard');
+  const strain = $('#strainCard');
+  const illness = $('#illnessCard');
+  const trend = $('#readinessTrendCard');
+
+  // We need a baseline of 3+ days of HRV or RHR to score.
+  const refKey = todayKey();
+  const score = RH ? RH.readinessScore(combined, refKey) : null;
+  const hasScore = score && score.parts.length > 0 && combinedDays(combined) >= 3;
+
+  if (!hasScore) {
+    empty.hidden = false;
+    [card, strain, illness, trend].forEach(c => c.hidden = true);
+    return;
+  }
+  empty.hidden = true;
+  [card, strain, illness, trend].forEach(c => c.hidden = false);
+
+  // Score dial
+  $('#readinessScore').textContent = score.score;
+  const ring = $('#readinessRing');
+  ring.setAttribute('stroke-dasharray', `${score.score} 100`);
+  // Band-color the ring + tag
+  ring.classList.remove('band-High', 'band-Solid', 'band-Modest', 'band-Low');
+  ring.classList.add('band-' + score.band);
+  const bandTag = $('#readinessBand');
+  bandTag.textContent = score.band;
+  bandTag.className = 'meta-tag band-' + score.band;
+
+  // Parts
+  const partsEl = $('#readinessParts'); partsEl.innerHTML = '';
+  score.parts.forEach(p => {
+    const li = document.createElement('li');
+    let dCls = 'flat', dTxt = '±0';
+    if (typeof p.delta === 'number' && isFinite(p.delta)) {
+      if (p.delta > 0.4) { dCls = 'up';   dTxt = '↑ ' + (p.label === 'Sleep' ? signed(p.delta) + 'h' : signed(p.delta) + 'σ'); }
+      else if (p.delta < -0.4) { dCls = 'down'; dTxt = '↓ ' + (p.label === 'Sleep' ? signed(p.delta) + 'h' : signed(p.delta) + 'σ'); }
+    }
+    li.innerHTML = `<span class="pl">${p.label}</span><span class="pv">${p.value}</span><span class="delta ${dCls}">${dTxt}</span>`;
+    partsEl.appendChild(li);
+  });
+  $('#readinessAdvice').textContent = score.advice;
+
+  // Strain flag
+  const strainFlag = RH.daytimeStrainFlag(combined, refKey);
+  const strainEl = $('#strainContent');
+  if (strainFlag) {
+    strainEl.className = 'flag-content ' + strainFlag.kind;
+    strainEl.textContent = strainFlag.text;
+  } else {
+    strainEl.className = 'flag-content idle';
+    strainEl.textContent = combined[refKey]?.walkingHrBpm != null
+      ? 'Walking HR is in your normal range today — nothing to flag.'
+      : 'Need walking HR data from Apple Health to assess daytime strain.';
+  }
+
+  // Illness early-warning
+  const illFlag = RH.illnessFlag(combined, refKey);
+  const illEl = $('#illnessContent');
+  if (illFlag) {
+    illEl.className = 'flag-content ' + illFlag.kind;
+    illEl.textContent = illFlag.text;
+  } else {
+    illEl.className = 'flag-content idle';
+    illEl.textContent = 'No illness markers elevated. Respiratory rate, wrist temp, and resting HR are all in your usual range.';
+  }
+
+  // 30-day readiness trend
+  charts.readiness?.destroy?.();
+  const colorText = getCSSVar('--text-muted');
+  const colorGrid = getCSSVar('--divider');
+  const colors = { High: getCSSVar('--success'), Solid: getCSSVar('--water'), Modest: getCSSVar('--warning'), Low: getCSSVar('--danger') };
+  const days30 = lastNDays(30);
+  const labels = days30.map(d => d.date.getDate());
+  const data = [], bar = [];
+  let sum = 0, n = 0;
+  days30.forEach(d => {
+    const r = RH.readinessScore(combined, d.key);
+    if (r && r.parts.length > 0 && combinedDays(combined, d.key) >= 3) {
+      data.push(r.score); bar.push(colors[r.band]); sum += r.score; n++;
+    } else { data.push(null); bar.push(getCSSVar('--surface-3')); }
+  });
+  charts.readiness = new Chart($('#chartReadiness'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: bar, borderRadius: 4, maxBarThickness: 14 }] },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y == null ? 'no data' : c.parsed.y + ' / 100' } } },
+      scales: { y: { beginAtZero: true, max: 100, grid: { color: colorGrid }, ticks: { stepSize: 25, color: colorText } }, x: { grid: { display: false } } }
+    }
+  });
+  $('#readinessAvg').textContent = n > 0 ? `${Math.round(sum / n)} avg` : 'building baseline';
+}
+
+function combinedDays(combined, refKey = todayKey()) {
+  // Count of distinct days in the trailing 30 with at least HRV or RHR.
+  const ref = new Date(refKey + 'T12:00:00');
+  let n = 0;
+  for (let i = 1; i <= 30; i++) {
+    const d = new Date(ref); d.setDate(ref.getDate() - i);
+    const k = todayKey(d);
+    const r = combined[k];
+    if (r && (r.hrvMs != null || r.rhrBpm != null)) n++;
+  }
+  return n;
+}
+
+/* ===== HEALTH IMPORT UI (Settings) ===== */
+function renderHealthStatus() {
+  const meta = state.healthMeta || {};
+  const hasData = state.health && Object.keys(state.health).length > 0;
+  $('#btnHealthClear').hidden = !hasData;
+  if (!hasData) {
+    $('#healthStatus').textContent = 'No Apple Health data imported yet.';
+    return;
+  }
+  const when = meta.lastImport ? new Date(meta.lastImport).toLocaleString() : '';
+  $('#healthStatus').textContent = `Last import: ${when} · ${meta.dayCount || Object.keys(state.health).length} days · ${(meta.recordsScanned||0).toLocaleString()} records scanned.`;
+}
+
+function bindHealthImport() {
+  const input = $('#healthInput');
+  const progress = $('#healthProgress');
+  const progressBar = $('#healthProgressBar');
+  const progressText = $('#healthProgressText');
+
+  input.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    if (!window.RitualHealth || typeof fflate === 'undefined') {
+      toast('Health module not loaded'); return;
+    }
+    progress.hidden = false;
+    progressBar.style.width = '0%';
+    progressText.textContent = 'Reading export.zip…';
+    try {
+      const result = await window.RitualHealth.importHealthZip(file, (p) => {
+        progressBar.style.width = Math.round((p.pct || 0) * 100) + '%';
+        if (p.phase === 'unzipping') progressText.textContent = 'Unzipping export…';
+        else if (p.phase === 'parsing') progressText.textContent = `Parsing records… ${p.records ? p.records.toLocaleString() : ''}`;
+        else if (p.phase === 'aggregating') progressText.textContent = 'Aggregating per-day metrics…';
+        else if (p.phase === 'done') progressText.textContent = `Done. ${p.days} days indexed.`;
+      });
+      // Merge: imported wins, but keep prior days that aren't in this export.
+      state.health = Object.assign({}, state.health || {}, result.days);
+      state.healthMeta = { lastImport: Date.now(), recordsScanned: result.recordsScanned, dayCount: Object.keys(state.health).length };
+      save();
+      renderHealthStatus();
+      toast(`Imported ${Object.keys(result.days).length} days of Apple Health data`);
+      setTimeout(() => { progress.hidden = true; }, 1500);
+    } catch (err) {
+      console.error(err);
+      progressText.textContent = 'Import failed: ' + (err.message || 'unknown error');
+      progressBar.style.width = '0%';
+      toast('Import failed');
+    } finally {
+      input.value = ''; // allow re-uploading same file
+    }
+  });
+
+  $('#btnHealthClear').addEventListener('click', () => {
+    if (!confirm('Clear all imported Apple Health data? Your habit logs will not be touched.')) return;
+    state.health = {};
+    state.healthMeta = { lastImport: null, recordsScanned: 0, dayCount: 0 };
+    save();
+    renderHealthStatus();
+    toast('Apple Health data cleared');
+  });
+}
+
+/* ===== Extended Patterns charts (sleep, HRV, stages, resp/temp, correlations) ===== */
+function renderHealthPatterns() {
+  const combined = buildCombinedHealth();
+  const colorPrimary = getCSSVar('--primary');
+  const colorWater = getCSSVar('--water');
+  const colorCaffeine = getCSSVar('--caffeine');
+  const colorText = getCSSVar('--text-muted');
+  const colorGrid = getCSSVar('--divider');
+
+  ['sleepHabit', 'hrvRhr', 'stages', 'respTemp', 'sleepHrv2', 'routineReady', 'waterHrv'].forEach(k => charts[k]?.destroy?.());
+
+  const days30 = lastNDays(30);
+  const labels30 = days30.map(d => d.date.getDate());
+  const days14 = lastNDays(14);
+  const labels14 = days14.map(d => d.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+
+  // Sleep duration bar (30d)
+  const sleepArr = days30.map(d => combined[d.key]?.sleepH ?? null);
+  charts.sleepHabit = new Chart($('#chartSleepHabit'), {
+    type: 'bar',
+    data: { labels: labels30, datasets: [{ data: sleepArr, backgroundColor: colorPrimary, borderRadius: 4, maxBarThickness: 14 }] },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y == null ? 'no data' : c.parsed.y.toFixed(1) + ' h' } } },
+      scales: { y: { beginAtZero: false, suggestedMin: 4, suggestedMax: 10, grid: { color: colorGrid } }, x: { grid: { display: false } } }
+    }
+  });
+  const sleepValid = sleepArr.filter(v => typeof v === 'number');
+  $('#sleepHabAvg').textContent = sleepValid.length
+    ? `${(sleepValid.reduce((a,b)=>a+b,0)/sleepValid.length).toFixed(1)} h avg`
+    : 'no data';
+
+  // HRV + RHR dual line (30d)
+  const hrv = days30.map(d => combined[d.key]?.hrvMs ?? null);
+  const rhr = days30.map(d => combined[d.key]?.rhrBpm ?? null);
+  charts.hrvRhr = new Chart($('#chartHrvRhr'), {
+    type: 'line',
+    data: { labels: labels30, datasets: [
+      { label: 'HRV', data: hrv, borderColor: colorPrimary, yAxisID: 'y', tension: 0.35, pointRadius: 2, borderWidth: 2, spanGaps: true },
+      { label: 'RHR', data: rhr, borderColor: colorWater, yAxisID: 'y1', tension: 0.35, pointRadius: 2, borderWidth: 2, spanGaps: true }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        y:  { position: 'left', grid: { color: colorGrid }, title: { display: true, text: 'ms', color: colorText } },
+        y1: { position: 'right', grid: { display: false }, title: { display: true, text: 'bpm', color: colorText } },
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } }
+      }
+    }
+  });
+
+  // Stages stacked bar (14d)
+  const stagesData = {
+    deep:  days14.map(d => combined[d.key]?.sleepStages?.deepH  ?? 0),
+    rem:   days14.map(d => combined[d.key]?.sleepStages?.remH   ?? 0),
+    core:  days14.map(d => combined[d.key]?.sleepStages?.coreH  ?? 0),
+    awake: days14.map(d => combined[d.key]?.sleepStages?.awakeH ?? 0)
+  };
+  charts.stages = new Chart($('#chartStages'), {
+    type: 'bar',
+    data: { labels: labels14, datasets: [
+      { label: 'Deep',  data: stagesData.deep,  backgroundColor: getCSSVar('--stage-deep'),  stack: 's' },
+      { label: 'REM',   data: stagesData.rem,   backgroundColor: getCSSVar('--stage-rem'),   stack: 's' },
+      { label: 'Core',  data: stagesData.core,  backgroundColor: getCSSVar('--stage-core'),  stack: 's' },
+      { label: 'Awake', data: stagesData.awake, backgroundColor: getCSSVar('--stage-awake'), stack: 's' }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(1)} h` } } },
+      scales: { y: { stacked: true, beginAtZero: true, grid: { color: colorGrid }, title: { display: true, text: 'h', color: colorText } }, x: { stacked: true, grid: { display: false } } }
+    }
+  });
+
+  // Respiratory rate + wrist temp (30d, dual axis)
+  const resp = days30.map(d => combined[d.key]?.respRate ?? null);
+  const temp = days30.map(d => combined[d.key]?.wristTempC ?? null);
+  charts.respTemp = new Chart($('#chartRespTemp'), {
+    type: 'line',
+    data: { labels: labels30, datasets: [
+      { label: 'Resp /min', data: resp, borderColor: colorPrimary, yAxisID: 'y', tension: 0.35, pointRadius: 2, borderWidth: 2, spanGaps: true },
+      { label: 'Wrist temp', data: temp, borderColor: colorCaffeine, yAxisID: 'y1', tension: 0.35, pointRadius: 2, borderWidth: 2, spanGaps: true }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        y:  { position: 'left', grid: { color: colorGrid }, title: { display: true, text: '/min', color: colorText } },
+        y1: { position: 'right', grid: { display: false }, title: { display: true, text: '°C', color: colorText } },
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } }
+      }
+    }
+  });
+
+  // Correlations
+  // Sleep -> next-day HRV: pair night-of-{key} sleep with the HRV recorded on the same key.
+  const sleepHrvPts = [];
+  Object.keys(combined).forEach(k => {
+    const r = combined[k];
+    if (r.sleepH != null && r.hrvMs != null) sleepHrvPts.push({ x: r.sleepH, y: r.hrvMs });
+  });
+  charts.sleepHrv2 = new Chart($('#chartSleepHrv2'), {
+    type: 'scatter',
+    data: { datasets: [{ data: sleepHrvPts, backgroundColor: colorPrimary, pointRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } },
+      scales: {
+        x: { title: { display: true, text: 'Sleep (h)', color: colorText }, grid: { color: colorGrid } },
+        y: { title: { display: true, text: 'HRV (ms)', color: colorText }, grid: { color: colorGrid } }
+      }
+    }
+  });
+  $('#corrSleepHrvTag').textContent = sleepHrvPts.length >= 4
+    ? `r = ${pearson(sleepHrvPts.map(p=>p.x), sleepHrvPts.map(p=>p.y)).toFixed(2)}`
+    : `${sleepHrvPts.length} pts — log more`;
+
+  // Routines vs readiness
+  const RH = window.RitualHealth;
+  const routineReadyPts = [];
+  Object.keys(combined).forEach(k => {
+    const adh = adherencePct(state.days[k]);
+    const r = RH ? RH.readinessScore(combined, k) : null;
+    if (adh > 0 && r && r.parts.length > 0 && combinedDays(combined, k) >= 3) routineReadyPts.push({ x: adh, y: r.score });
+  });
+  charts.routineReady = new Chart($('#chartRoutineReady'), {
+    type: 'scatter',
+    data: { datasets: [{ data: routineReadyPts, backgroundColor: colorWater, pointRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } },
+      scales: {
+        x: { title: { display: true, text: 'Routines (%)', color: colorText }, grid: { color: colorGrid }, min: 0, max: 100 },
+        y: { title: { display: true, text: 'Readiness', color: colorText }, grid: { color: colorGrid }, min: 0, max: 100 }
+      }
+    }
+  });
+  $('#corrRoutineReadyTag').textContent = routineReadyPts.length >= 4
+    ? `r = ${pearson(routineReadyPts.map(p=>p.x), routineReadyPts.map(p=>p.y)).toFixed(2)}`
+    : `${routineReadyPts.length} pts — log more`;
+
+  // Hydration vs HRV
+  const waterHrvPts = [];
+  Object.keys(combined).forEach(k => {
+    const day = state.days[k];
+    if (!day) return;
+    if (day.water > 0 && combined[k].hrvMs != null) waterHrvPts.push({ x: day.water, y: combined[k].hrvMs });
+  });
+  charts.waterHrv = new Chart($('#chartWaterHrv'), {
+    type: 'scatter',
+    data: { datasets: [{ data: waterHrvPts, backgroundColor: colorCaffeine, pointRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } },
+      scales: {
+        x: { title: { display: true, text: 'Water (ml)', color: colorText }, grid: { color: colorGrid }, beginAtZero: true },
+        y: { title: { display: true, text: 'HRV (ms)', color: colorText }, grid: { color: colorGrid } }
+      }
+    }
+  });
+  $('#corrWaterHrvTag').textContent = waterHrvPts.length >= 4
+    ? `r = ${pearson(waterHrvPts.map(p=>p.x), waterHrvPts.map(p=>p.y)).toFixed(2)}`
+    : `${waterHrvPts.length} pts — log more`;
+}
+
+// Patch renderInsights to also render the health patterns block.
+const _origRenderInsights = renderInsights;
+renderInsights = function() {
+  _origRenderInsights();
+  renderHealthPatterns();
+};
+
+// Patch renderSettings to also refresh health status.
+const _origRenderSettings = renderSettings;
+renderSettings = function() {
+  _origRenderSettings();
+  renderHealthStatus();
+};
+
 // ------- Boot -------
 load();
 renderDateStrip();
@@ -697,3 +1272,4 @@ renderToday();
 bindLoggers();
 bindTabs();
 bindSettings();
+bindHealthImport();
